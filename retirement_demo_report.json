@@ -1,0 +1,979 @@
+{
+  "timeline": [
+    {
+      "t": 1794853468.3704553,
+      "msg": "schema initialized"
+    },
+    {
+      "t": 1794853468.3704832,
+      "msg": "scenario A: barrier choreography with 3 processes"
+    },
+    {
+      "t": 1794853468.4888728,
+      "msg": "admission closed; old readers P1/P3 still in flight"
+    },
+    {
+      "t": 1794853470.0098119,
+      "msg": "parent inserted a row directly while retirement waits"
+    },
+    {
+      "t": 1794853470.170858,
+      "msg": "scenario B: SIGKILL consumer and coordinators; resume from DB alone"
+    },
+    {
+      "t": 1794853470.4178634,
+      "msg": "scenario C: crash after DDL commit, before response"
+    },
+    {
+      "t": 1794853470.620811,
+      "msg": "scenario C2: out-of-band drop + same-name recreate mid-retirement"
+    },
+    {
+      "t": 1794853470.733243,
+      "msg": "scenario D: dependent view blocks; DDL lock timeout retriable"
+    },
+    {
+      "t": 1794853471.956936,
+      "msg": "scenario E: immutability, display rename, drain/re-activate"
+    }
+  ],
+  "assertions": [
+    {
+      "name": "A: precheck is read-only (no run identity consumed, no admission change)",
+      "ok": true,
+      "detail": "{'runs': [], 'retirements': [], 'fields': [('41e49946-0af0-468a-a05b-9992947d2413', 'active', 'new_value'), ('519e018a-84e6-4f81-b430-f978f3aa269b', 'active', 'old_value')], 'revisions': [('0221530d-a477-4cd1-b207-6389c38fdb7d', 'active'), ('d8001377-6142-4626-94b5-2cd7a262c557', 'active')]} vs {'runs': [], 'retirements': [], 'fields': [('41e49946-0af0-468a-a05b-9992947d2413', 'active', 'new_value'), ('519e018a-84e6-4f81-b430-f978f3aa269b', 'active', 'old_value')], 'revisions': [('0221530d-a477-4cd1-b207-6389c38fdb7d', 'active'), ('d8001377-6142-4626-94b5-2cd7a262c557', 'active')]}"
+    },
+    {
+      "name": "A: precheck derives dependency from declarations",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: precheck blocks start while dependent revision active",
+      "ok": true,
+      "detail": "['revision etl-old/a1 is active (must be drained first)']"
+    },
+    {
+      "name": "A: no table-wide exclusive lock held while waiting",
+      "ok": true,
+      "detail": "[('AccessShareLock',), ('AccessShareLock',)]"
+    },
+    {
+      "name": "A: late old consumer clearly rejected after closure",
+      "ok": true,
+      "detail": "(True, 'clearly rejected: revision etl-old/a1 is draining: admission closed (in-flight runs may finish, no new runs start)')"
+    },
+    {
+      "name": "A: new-version consumer completed during drain",
+      "ok": true,
+      "detail": "(True, {'n': 5, 'run_id': '750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe'})"
+    },
+    {
+      "name": "A: P1 (old reader) finished its stream",
+      "ok": true,
+      "detail": "(True, {'run_id': '7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d', 'first': {'old_value': 1, 'new_value': 10}, 'n_rest': 4})"
+    },
+    {
+      "name": "A: P3 (old revision, projected only new_value) finished",
+      "ok": true,
+      "detail": "(True, {'run_id': 'fc1cfb69-a2f6-4743-8281-c60ab20ff39c', 'first': {'new_value': 10}, 'n_rest': 4})"
+    },
+    {
+      "name": "A: retirer completed",
+      "ok": true,
+      "detail": "(True, {'status': {'retirement_id': 'ra-1', 'target': 'dsdata.metrics_a.old_value', 'phase': 'done', 'done': True, 'recovered': False, 'blocked_reason': None, 'ddl_committed_at': '2026-11-16 18:24:30.115030+00:00', 'ddl_committed': True}, 'precheck_blocks': ['revision etl-old/a1 is active (must be drained first)']})"
+    },
+    {
+      "name": "A: old_value physically dropped",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: new_value still present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: new_value data intact (5 rows + parent insert)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: field recorded retired",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: retirement recorded done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: exactly two runs admitted for old revision (P1, P3; P4 got no run identity)",
+      "ok": true,
+      "detail": "[('7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d', 'done', '[\"old_value\", \"new_value\"]', datetime.datetime(2026, 11, 16, 18, 24, 28, 455188, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), datetime.datetime(2026, 11, 16, 18, 24, 30, 15533, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), 'etl-old'), ('fc1cfb69-a2f6-4743-8281-c60ab20ff39c', 'done', '[\"new_value\"]', datetime.datetime(2026, 11, 16, 18, 24, 28, 458907, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), datetime.datetime(2026, 11, 16, 18, 24, 30, 15681, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), 'etl-old'), ('750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe', 'done', '[\"new_value\"]', datetime.datetime(2026, 11, 16, 18, 24, 28, 504363, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), datetime.datetime(2026, 11, 16, 18, 24, 28, 512396, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), 'etl-new')]"
+    },
+    {
+      "name": "A: both old runs finished before the DROP",
+      "ok": true,
+      "detail": "ddl_at=2026-11-16 18:24:30.115030+00:00"
+    },
+    {
+      "name": "A: P3 admitted before closure (racing admission is counted in-flight)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: dependency came from the declaration, not the projection (P3 selected only new_value yet DROP waited for it)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: new-version run completed before the DROP",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A: audit events recorded (admission_closed -> waiting -> column_dropped)",
+      "ok": true,
+      "detail": "['run_admitted', 'run_admitted', 'retirement_admission_closed', 'retirement_waiting', 'run_admitted', 'run_finished', 'run_finished', 'run_finished', 'column_dropped']"
+    },
+    {
+      "name": "B: old consumer in flight",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: coordinator-1 crashed after admission closure",
+      "ok": true,
+      "detail": "exitcode=1"
+    },
+    {
+      "name": "B: closure persisted in DB (not a transient lock)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: coordinator-2 reached the waiting phase",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: coordinator-2 SIGKILLed while waiting",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: old revision still rejected after coordinator crashes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: new dependent revision refused after retirement started",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: old revision admission cannot be restored",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: consumer SIGKILLed mid-stream",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: coordinator-3 resumed and completed",
+      "ok": true,
+      "detail": "(True, {'retirement_id': 'rb-1', 'target': 'dsdata.metrics_b.old_value', 'phase': 'done', 'done': True, 'recovered': False, 'blocked_reason': None, 'ddl_committed_at': '2026-11-16 18:24:30.370623+00:00', 'ddl_committed': True})"
+    },
+    {
+      "name": "B: killed consumer's run reclaimed as aborted (no permanent block)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: old_value physically dropped",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: new_value data intact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: retirement recorded done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: reclaim event audited",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: same id with changed target rejected",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: same id same target resumes as done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B: registration on retired column refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: coordinator crashed after DDL commit, before responding",
+      "ok": true,
+      "detail": "exitcode=1"
+    },
+    {
+      "name": "C: committed phase is visible in the database",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: another process recovered completion from the database alone",
+      "ok": true,
+      "detail": "(True, {'retirement_id': 'rc-1', 'target': 'dsdata.metrics_c.old_value', 'phase': 'done', 'done': True, 'recovered': False, 'blocked_reason': None, 'ddl_committed_at': '2026-11-16 18:24:30.474557+00:00'})"
+    },
+    {
+      "name": "C: old_value physically dropped",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: new_value data intact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: re-resume with same-name new column present reports done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: same-name new column NOT dropped by recovery",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: same-name new column data intact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C: name reuse did not reuse identity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2: coordinator crashed after admission closure",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2: resume treats target as recovered-complete via persistent record + identity match",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2: impostor same-name column NOT dropped",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2: impostor data intact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2: original field recorded retired",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: retirement blocked by dependent view",
+      "ok": true,
+      "detail": "retirement rd-1 blocked by catalog dependencies (preserved, no CASCADE): pg_rewrite view v_d_old"
+    },
+    {
+      "name": "D: blocked phase persisted",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: view preserved (no CASCADE)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: column preserved while blocked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: view still usable",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: blocker holds ACCESS EXCLUSIVE",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: DDL lock timeout surfaces as retriable failure",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: column intact after timed-out DDL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: retirement not done yet (retriable state)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: retry after unblock completes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D: old_value dropped, new_value intact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E: revision declaration immutable (trigger)",
+      "ok": true,
+      "detail": "consumer revision declarations are immutable\nCONTEXT:  PL/pgSQL function ds_meta"
+    },
+    {
+      "name": "E: declaration unchanged after attempt",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E: display rename keeps identity; query by new display name works",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E: field_id unchanged by rename",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E: drain -> re-activate works before any retirement on its fields",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "scenarios": {
+    "A": {
+      "precheck": {
+        "schema": "dsdata",
+        "table": "metrics_a",
+        "column": "old_value",
+        "table_registered": true,
+        "field": {
+          "field_id": "519e018a-84e6-4f81-b430-f978f3aa269b",
+          "table_id": "7c337ec9-9fa2-4c9c-92b8-41d77318258d",
+          "column_name": "old_value",
+          "display_name": "old_value",
+          "data_type": "integer",
+          "status": "active",
+          "identity_token": "b9d294d1-e37b-4449-a92c-81d6316ef036",
+          "created_at": "2026-11-16 18:24:28.374088+00:00",
+          "retired_at": null
+        },
+        "dependent_revisions": [
+          {
+            "revision_id": "0221530d-a477-4cd1-b207-6389c38fdb7d",
+            "consumer_name": "etl-old",
+            "revision_label": "a1",
+            "status": "active",
+            "in_flight": 0
+          }
+        ],
+        "physical_column_present": true,
+        "catalog_dependents": [],
+        "can_start": false,
+        "blocks": [
+          "revision etl-old/a1 is active (must be drained first)"
+        ]
+      },
+      "locks_during_wait": [
+        "AccessShareLock",
+        "AccessShareLock"
+      ],
+      "results": {
+        "P4": [
+          true,
+          "clearly rejected: revision etl-old/a1 is draining: admission closed (in-flight runs may finish, no new runs start)"
+        ],
+        "P5": [
+          true,
+          "{'n': 5, 'run_id': '750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe'}"
+        ],
+        "P1": [
+          true,
+          "{'run_id': '7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d', 'first': {'old_value': 1, 'new_value': 10}, 'n_rest': 4}"
+        ],
+        "P3": [
+          true,
+          "{'run_id': 'fc1cfb69-a2f6-4743-8281-c60ab20ff39c', 'first': {'new_value': 10}, 'n_rest': 4}"
+        ],
+        "RET": [
+          true,
+          "{'status': {'retirement_id': 'ra-1', 'target': 'dsdata.metrics_a.old_value', 'phase': 'done', 'done': True, 'recovered': False, 'blocked_reason': None, 'ddl_committed_at': '2026-11-16 18:24:30.115030+00:00', 'ddl_committed': True}, 'precheck_blocks': ['revision etl-old/a1 is active (must be drained first)']}"
+        ]
+      },
+      "runs": [
+        [
+          "7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d",
+          "done",
+          "[\"old_value\", \"new_value\"]",
+          "2026-11-16 18:24:28.455188+00:00",
+          "2026-11-16 18:24:30.015533+00:00",
+          "etl-old"
+        ],
+        [
+          "fc1cfb69-a2f6-4743-8281-c60ab20ff39c",
+          "done",
+          "[\"new_value\"]",
+          "2026-11-16 18:24:28.458907+00:00",
+          "2026-11-16 18:24:30.015681+00:00",
+          "etl-old"
+        ],
+        [
+          "750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe",
+          "done",
+          "[\"new_value\"]",
+          "2026-11-16 18:24:28.504363+00:00",
+          "2026-11-16 18:24:28.512396+00:00",
+          "etl-new"
+        ]
+      ]
+    }
+  },
+  "catalog": {
+    "metrics_a": [
+      [
+        "........pg.dropped.1........",
+        "-",
+        true
+      ],
+      [
+        "new_value",
+        "bigint",
+        false
+      ]
+    ],
+    "metrics_b": [
+      [
+        "........pg.dropped.1........",
+        "-",
+        true
+      ],
+      [
+        "new_value",
+        "bigint",
+        false
+      ]
+    ],
+    "metrics_c": [
+      [
+        "........pg.dropped.1........",
+        "-",
+        true
+      ],
+      [
+        "new_value",
+        "bigint",
+        false
+      ],
+      [
+        "old_value",
+        "text",
+        false
+      ]
+    ],
+    "metrics_c2": [
+      [
+        "........pg.dropped.1........",
+        "-",
+        true
+      ],
+      [
+        "new_value",
+        "bigint",
+        false
+      ],
+      [
+        "old_value",
+        "text",
+        false
+      ]
+    ],
+    "metrics_d": [
+      [
+        "........pg.dropped.1........",
+        "-",
+        true
+      ],
+      [
+        "new_value",
+        "bigint",
+        false
+      ]
+    ]
+  },
+  "retirements": [
+    {
+      "retirement_id": "ra-1",
+      "phase": "done",
+      "blocked_reason": null,
+      "ddl_committed_at": "2026-11-16 18:24:30.115030+00:00"
+    },
+    {
+      "retirement_id": "rb-1",
+      "phase": "done",
+      "blocked_reason": null,
+      "ddl_committed_at": "2026-11-16 18:24:30.370623+00:00"
+    },
+    {
+      "retirement_id": "rc-1",
+      "phase": "done",
+      "blocked_reason": null,
+      "ddl_committed_at": "2026-11-16 18:24:30.474557+00:00"
+    },
+    {
+      "retirement_id": "rc2-1",
+      "phase": "done",
+      "blocked_reason": null,
+      "ddl_committed_at": "None"
+    },
+    {
+      "retirement_id": "rd-1",
+      "phase": "done",
+      "blocked_reason": null,
+      "ddl_committed_at": "2026-11-16 18:24:31.929703+00:00"
+    }
+  ],
+  "events": [
+    {
+      "id": 1,
+      "at": "2026-11-16 18:24:28.374088+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"519e018a-84e6-4f81-b430-f978f3aa269b\", \"table_id\": \"7c337ec9-9fa2-4c9c-92b8-41d77318258d\"}"
+    },
+    {
+      "id": 2,
+      "at": "2026-11-16 18:24:28.374088+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"new_value\", \"field_id\": \"41e49946-0af0-468a-a05b-9992947d2413\", \"table_id\": \"7c337ec9-9fa2-4c9c-92b8-41d77318258d\"}"
+    },
+    {
+      "id": 3,
+      "at": "2026-11-16 18:24:28.374088+00:00",
+      "pid": 914,
+      "kind": "table_created",
+      "detail": "{\"table\": \"metrics_a\", \"schema\": \"dsdata\"}"
+    },
+    {
+      "id": 4,
+      "at": "2026-11-16 18:24:28.392564+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"a1\", \"fields\": [\"519e018a-84e6-4f81-b430-f978f3aa269b\", \"41e49946-0af0-468a-a05b-9992947d2413\"], \"consumer\": \"etl-old\", \"revision_id\": \"0221530d-a477-4cd1-b207-6389c38fdb7d\"}"
+    },
+    {
+      "id": 5,
+      "at": "2026-11-16 18:24:28.400100+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"a1\", \"fields\": [\"41e49946-0af0-468a-a05b-9992947d2413\"], \"consumer\": \"etl-new\", \"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 6,
+      "at": "2026-11-16 18:24:28.455188+00:00",
+      "pid": 931,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d\", \"revision_id\": \"0221530d-a477-4cd1-b207-6389c38fdb7d\"}"
+    },
+    {
+      "id": 7,
+      "at": "2026-11-16 18:24:28.458907+00:00",
+      "pid": 932,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"fc1cfb69-a2f6-4743-8281-c60ab20ff39c\", \"revision_id\": \"0221530d-a477-4cd1-b207-6389c38fdb7d\"}"
+    },
+    {
+      "id": 8,
+      "at": "2026-11-16 18:24:28.478770+00:00",
+      "pid": 934,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"0221530d-a477-4cd1-b207-6389c38fdb7d\"}"
+    },
+    {
+      "id": 9,
+      "at": "2026-11-16 18:24:28.484291+00:00",
+      "pid": 934,
+      "kind": "retirement_admission_closed",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"519e018a-84e6-4f81-b430-f978f3aa269b\", \"retirement_id\": \"ra-1\"}"
+    },
+    {
+      "id": 10,
+      "at": "2026-11-16 18:24:28.492668+00:00",
+      "pid": 934,
+      "kind": "retirement_waiting",
+      "detail": "{\"retirement_id\": \"ra-1\"}"
+    },
+    {
+      "id": 11,
+      "at": "2026-11-16 18:24:28.504363+00:00",
+      "pid": 941,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe\", \"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 12,
+      "at": "2026-11-16 18:24:28.512396+00:00",
+      "pid": 941,
+      "kind": "run_finished",
+      "detail": "{\"run_id\": \"750a400b-cb4b-40bd-b4d8-ecb0b55fa1fe\"}"
+    },
+    {
+      "id": 13,
+      "at": "2026-11-16 18:24:30.015533+00:00",
+      "pid": 931,
+      "kind": "run_finished",
+      "detail": "{\"run_id\": \"7cbd1aaa-0df3-4dd1-9ab9-641e4b6af15d\"}"
+    },
+    {
+      "id": 14,
+      "at": "2026-11-16 18:24:30.015681+00:00",
+      "pid": 932,
+      "kind": "run_finished",
+      "detail": "{\"run_id\": \"fc1cfb69-a2f6-4743-8281-c60ab20ff39c\"}"
+    },
+    {
+      "id": 15,
+      "at": "2026-11-16 18:24:30.115030+00:00",
+      "pid": 934,
+      "kind": "column_dropped",
+      "detail": "{\"column\": \"old_value\", \"retirement_id\": \"ra-1\"}"
+    },
+    {
+      "id": 16,
+      "at": "2026-11-16 18:24:30.173486+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"e2b71269-c16b-4e60-824e-ea40b72b302b\", \"table_id\": \"3fc35cf5-211d-4fdb-8cec-5c2660f5531b\"}"
+    },
+    {
+      "id": 17,
+      "at": "2026-11-16 18:24:30.173486+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"new_value\", \"field_id\": \"b726a49c-862d-416c-be05-450938934e18\", \"table_id\": \"3fc35cf5-211d-4fdb-8cec-5c2660f5531b\"}"
+    },
+    {
+      "id": 18,
+      "at": "2026-11-16 18:24:30.173486+00:00",
+      "pid": 914,
+      "kind": "table_created",
+      "detail": "{\"table\": \"metrics_b\", \"schema\": \"dsdata\"}"
+    },
+    {
+      "id": 19,
+      "at": "2026-11-16 18:24:30.186397+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"b1\", \"fields\": [\"e2b71269-c16b-4e60-824e-ea40b72b302b\", \"b726a49c-862d-416c-be05-450938934e18\"], \"consumer\": \"etl-old\", \"revision_id\": \"1297822e-e5e5-4666-bb3a-4e066e49781d\"}"
+    },
+    {
+      "id": 20,
+      "at": "2026-11-16 18:24:30.194228+00:00",
+      "pid": 967,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"ff62d000-a621-46b1-bea1-55d03195f23a\", \"revision_id\": \"1297822e-e5e5-4666-bb3a-4e066e49781d\"}"
+    },
+    {
+      "id": 21,
+      "at": "2026-11-16 18:24:30.203419+00:00",
+      "pid": 914,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"1297822e-e5e5-4666-bb3a-4e066e49781d\"}"
+    },
+    {
+      "id": 22,
+      "at": "2026-11-16 18:24:30.211639+00:00",
+      "pid": 970,
+      "kind": "retirement_admission_closed",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"e2b71269-c16b-4e60-824e-ea40b72b302b\", \"retirement_id\": \"rb-1\"}"
+    },
+    {
+      "id": 23,
+      "at": "2026-11-16 18:24:30.229237+00:00",
+      "pid": 973,
+      "kind": "retirement_waiting",
+      "detail": "{\"retirement_id\": \"rb-1\"}"
+    },
+    {
+      "id": 24,
+      "at": "2026-11-16 18:24:30.366876+00:00",
+      "pid": 982,
+      "kind": "run_aborted_dead_owner",
+      "detail": "{\"run_id\": \"ff62d000-a621-46b1-bea1-55d03195f23a\", \"retirement_id\": \"rb-1\"}"
+    },
+    {
+      "id": 25,
+      "at": "2026-11-16 18:24:30.370623+00:00",
+      "pid": 982,
+      "kind": "column_dropped",
+      "detail": "{\"column\": \"old_value\", \"retirement_id\": \"rb-1\"}"
+    },
+    {
+      "id": 26,
+      "at": "2026-11-16 18:24:30.420652+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"5750c31d-2450-46ca-9e36-afe04b238f4c\", \"table_id\": \"a1ea68ad-90cf-4a94-b2f4-3fd83839c753\"}"
+    },
+    {
+      "id": 27,
+      "at": "2026-11-16 18:24:30.420652+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"new_value\", \"field_id\": \"5c69ffa3-17e5-45e8-bd46-9ca5224a5aa2\", \"table_id\": \"a1ea68ad-90cf-4a94-b2f4-3fd83839c753\"}"
+    },
+    {
+      "id": 28,
+      "at": "2026-11-16 18:24:30.420652+00:00",
+      "pid": 914,
+      "kind": "table_created",
+      "detail": "{\"table\": \"metrics_c\", \"schema\": \"dsdata\"}"
+    },
+    {
+      "id": 29,
+      "at": "2026-11-16 18:24:30.433979+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"c1\", \"fields\": [\"5750c31d-2450-46ca-9e36-afe04b238f4c\"], \"consumer\": \"etl-old\", \"revision_id\": \"1ce6950d-3faa-4aa5-9042-fc9326db3e09\"}"
+    },
+    {
+      "id": 30,
+      "at": "2026-11-16 18:24:30.440025+00:00",
+      "pid": 914,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"1ce6950d-3faa-4aa5-9042-fc9326db3e09\"}"
+    },
+    {
+      "id": 31,
+      "at": "2026-11-16 18:24:30.452259+00:00",
+      "pid": 1002,
+      "kind": "retirement_admission_closed",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"5750c31d-2450-46ca-9e36-afe04b238f4c\", \"retirement_id\": \"rc-1\"}"
+    },
+    {
+      "id": 32,
+      "at": "2026-11-16 18:24:30.462066+00:00",
+      "pid": 1002,
+      "kind": "retirement_waiting",
+      "detail": "{\"retirement_id\": \"rc-1\"}"
+    },
+    {
+      "id": 33,
+      "at": "2026-11-16 18:24:30.474557+00:00",
+      "pid": 1002,
+      "kind": "column_dropped",
+      "detail": "{\"column\": \"old_value\", \"retirement_id\": \"rc-1\"}"
+    },
+    {
+      "id": 34,
+      "at": "2026-11-16 18:24:30.580134+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"47e87199-fe8e-49b9-9383-599d4f27c7aa\", \"table_id\": \"a1ea68ad-90cf-4a94-b2f4-3fd83839c753\"}"
+    },
+    {
+      "id": 35,
+      "at": "2026-11-16 18:24:30.623814+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"6dd032e9-82c7-4ef7-bcb2-201d02730594\", \"table_id\": \"606e81ce-67fa-4a01-8fde-1b617b1277c2\"}"
+    },
+    {
+      "id": 36,
+      "at": "2026-11-16 18:24:30.623814+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"new_value\", \"field_id\": \"ae823c3a-d6a4-4d59-a84f-5cb38711e427\", \"table_id\": \"606e81ce-67fa-4a01-8fde-1b617b1277c2\"}"
+    },
+    {
+      "id": 37,
+      "at": "2026-11-16 18:24:30.623814+00:00",
+      "pid": 914,
+      "kind": "table_created",
+      "detail": "{\"table\": \"metrics_c2\", \"schema\": \"dsdata\"}"
+    },
+    {
+      "id": 38,
+      "at": "2026-11-16 18:24:30.637512+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"c2\", \"fields\": [\"6dd032e9-82c7-4ef7-bcb2-201d02730594\"], \"consumer\": \"etl-old\", \"revision_id\": \"d4529025-935a-46f0-9f54-2d5b160937ee\"}"
+    },
+    {
+      "id": 39,
+      "at": "2026-11-16 18:24:30.644684+00:00",
+      "pid": 914,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"d4529025-935a-46f0-9f54-2d5b160937ee\"}"
+    },
+    {
+      "id": 40,
+      "at": "2026-11-16 18:24:30.656624+00:00",
+      "pid": 1026,
+      "kind": "retirement_admission_closed",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"6dd032e9-82c7-4ef7-bcb2-201d02730594\", \"retirement_id\": \"rc2-1\"}"
+    },
+    {
+      "id": 41,
+      "at": "2026-11-16 18:24:30.705990+00:00",
+      "pid": 914,
+      "kind": "retirement_recovered_complete",
+      "detail": "{\"note\": \"a different same-name field now occupies the name; leaving it untouched\", \"retirement_id\": \"rc2-1\"}"
+    },
+    {
+      "id": 42,
+      "at": "2026-11-16 18:24:30.738050+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"254389d1-69b4-47c7-9b07-b12a822b43b7\", \"table_id\": \"cf8cc778-32b8-4434-8723-2e6ae8d6623c\"}"
+    },
+    {
+      "id": 43,
+      "at": "2026-11-16 18:24:30.738050+00:00",
+      "pid": 914,
+      "kind": "field_registered",
+      "detail": "{\"column\": \"new_value\", \"field_id\": \"c12b8b3b-6d4d-49ed-8811-1de4b2ed7d0a\", \"table_id\": \"cf8cc778-32b8-4434-8723-2e6ae8d6623c\"}"
+    },
+    {
+      "id": 44,
+      "at": "2026-11-16 18:24:30.738050+00:00",
+      "pid": 914,
+      "kind": "table_created",
+      "detail": "{\"table\": \"metrics_d\", \"schema\": \"dsdata\"}"
+    },
+    {
+      "id": 45,
+      "at": "2026-11-16 18:24:30.757692+00:00",
+      "pid": 914,
+      "kind": "revision_registered",
+      "detail": "{\"label\": \"d1\", \"fields\": [\"254389d1-69b4-47c7-9b07-b12a822b43b7\"], \"consumer\": \"etl-old\", \"revision_id\": \"34bc3d16-1e50-47e8-bfec-ffc308a51b3c\"}"
+    },
+    {
+      "id": 46,
+      "at": "2026-11-16 18:24:30.764087+00:00",
+      "pid": 914,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"34bc3d16-1e50-47e8-bfec-ffc308a51b3c\"}"
+    },
+    {
+      "id": 47,
+      "at": "2026-11-16 18:24:30.790706+00:00",
+      "pid": 914,
+      "kind": "retirement_admission_closed",
+      "detail": "{\"column\": \"old_value\", \"field_id\": \"254389d1-69b4-47c7-9b07-b12a822b43b7\", \"retirement_id\": \"rd-1\"}"
+    },
+    {
+      "id": 48,
+      "at": "2026-11-16 18:24:30.802022+00:00",
+      "pid": 914,
+      "kind": "retirement_waiting",
+      "detail": "{\"retirement_id\": \"rd-1\"}"
+    },
+    {
+      "id": 49,
+      "at": "2026-11-16 18:24:30.814912+00:00",
+      "pid": 914,
+      "kind": "retirement_blocked",
+      "detail": "{\"dependents\": [{\"kind\": \"pg_rewrite\", \"object\": \"view v_d_old\"}], \"retirement_id\": \"rd-1\"}"
+    },
+    {
+      "id": 50,
+      "at": "2026-11-16 18:24:31.929703+00:00",
+      "pid": 914,
+      "kind": "column_dropped",
+      "detail": "{\"column\": \"old_value\", \"retirement_id\": \"rd-1\"}"
+    },
+    {
+      "id": 51,
+      "at": "2026-11-16 18:24:31.975466+00:00",
+      "pid": 914,
+      "kind": "field_display_renamed",
+      "detail": "{\"field_id\": \"41e49946-0af0-468a-a05b-9992947d2413\", \"display_name\": \"New Value\"}"
+    },
+    {
+      "id": 52,
+      "at": "2026-11-16 18:24:31.980392+00:00",
+      "pid": 914,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"b852aef5-47e8-4f81-9009-dcb5758760cc\", \"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 53,
+      "at": "2026-11-16 18:24:31.986748+00:00",
+      "pid": 914,
+      "kind": "run_finished",
+      "detail": "{\"run_id\": \"b852aef5-47e8-4f81-9009-dcb5758760cc\"}"
+    },
+    {
+      "id": 54,
+      "at": "2026-11-16 18:24:31.995435+00:00",
+      "pid": 914,
+      "kind": "revision_draining",
+      "detail": "{\"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 55,
+      "at": "2026-11-16 18:24:32.001773+00:00",
+      "pid": 914,
+      "kind": "revision_active",
+      "detail": "{\"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 56,
+      "at": "2026-11-16 18:24:32.008498+00:00",
+      "pid": 914,
+      "kind": "run_admitted",
+      "detail": "{\"run_id\": \"9fd17df6-aae6-4e6a-b12a-e1629eb74f4b\", \"revision_id\": \"d8001377-6142-4626-94b5-2cd7a262c557\"}"
+    },
+    {
+      "id": 57,
+      "at": "2026-11-16 18:24:32.014488+00:00",
+      "pid": 914,
+      "kind": "run_finished",
+      "detail": "{\"run_id\": \"9fd17df6-aae6-4e6a-b12a-e1629eb74f4b\"}"
+    }
+  ],
+  "summary": {
+    "total": 68,
+    "failed": 0
+  }
+}
